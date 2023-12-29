@@ -6,3 +6,7 @@ vendor
 *.iml
 *.out
 .vscode
+
+config.yml
+ssl
+*.pem
