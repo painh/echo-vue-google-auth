@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/redis/go-redis/v9"
 	"painh.com/echo-vue-google-auth/config"
 	"strconv"
@@ -33,6 +34,14 @@ func GetRedisClient() *redis.Client {
 
 func SessionRedisSet(key string, value interface{}) *redis.StatusCmd {
 	expiration := time.Duration(ttl) * time.Second
-	cmd := RedisClient.Set(context.Background(), key, value, expiration)
+	// value 를 json string으로 변환
+	valueJson, _ := json.Marshal(value)
+
+	cmd := RedisClient.Set(context.Background(), key, valueJson, expiration)
+	return cmd
+}
+
+func SessionRedisGet(key string) *redis.StringCmd {
+	cmd := RedisClient.Get(context.Background(), key)
 	return cmd
 }

@@ -10,6 +10,7 @@
 import {defineComponent, ref} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import axios from 'axios';
+import {setCookie} from "../utils/sessionManager.ts";
 
 const api = import.meta.env.VITE_SERVER_ENDPOINT;
 
@@ -30,6 +31,14 @@ export default defineComponent({
           if (response.status === 200) {
             loginStatus.value = 200;
             loginStatusText.value = response.data;
+            // response.data.sessionKey 있는지 체크
+            if (!response.data.sessionKey) {
+              alert('로그인 실패');
+              router.push('/login');
+            }
+
+            const sessionSecret = 60 * 60 * 12;
+            setCookie('session', response.data.sessionKey, sessionSecret);
           } else {
             alert('로그인 실패');
             router.push('/login');

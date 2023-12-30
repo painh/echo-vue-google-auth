@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -85,7 +86,11 @@ func configureRoutes(e *echo.Echo) {
 		}
 
 		sessionKey := createSessionKey(user.Email)
-		utils.SessionRedisSet(sessionKey, user)
+		cmd := utils.SessionRedisSet(sessionKey, user)
+
+		if cmd.Err() != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, cmd.Err().Error())
+		}
 
 		// sessionKey를 추가해서 반환
 		return c.JSON(http.StatusOK, map[string]interface{}{
@@ -100,17 +105,35 @@ func configureRoutes(e *echo.Echo) {
 	// 미들웨어를 사용하여 인증 확인
 	g.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			sess, _ := session.Get("session", c)
-			if sess.Values["user"] == nil {
-				return echo.ErrUnauthorized
+			// Bearer 토큰을 가져옴
+			token := c.Request().Header.Get("Authorization")
+			token = token[7:]
+			session := utils.SessionRedisGet(token)
+
+			if session.Err() != nil {
+				return echo.NewHTTPError(http.StatusUnauthorized, "Invalid session")
 			}
+
+			// context에 session 추가. session의 val은 json string 이므로 map으로 변환해야함
+			sessionVal := session.Val()
+			sessionMap := make(map[string]interface{})
+			err := json.Unmarshal([]byte(sessionVal), &sessionMap)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+
+			c.Set("session", sessionMap)
+
 			return next(c)
 		}
 	})
 
 	// 인증이 필요한 라우터 경로 그룹에 핸들러 추가
 	g.GET("/echo", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Echo, World!")
+
+		session := c.Get("session").(map[string]interface{})
+		sessionJsonString, _ := json.Marshal(session)
+		return c.String(http.StatusOK, "Hello, "+string(sessionJsonString))
 	})
 }
 
